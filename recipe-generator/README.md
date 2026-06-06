@@ -43,6 +43,19 @@ Open http://127.0.0.1:5000 and start chatting.
 The "Why these pairings" panel shows the actual ingredients and similarity
 scores the model contributed.
 
+## Deploying to Render (live test URL)
+
+The repo root carries a `render.yaml` blueprint (free plan). In the Render
+dashboard: New > Blueprint > connect the GitHub repo > set `ANTHROPIC_API_KEY`
+when prompted. Render builds and serves the app at
+`https://epicure-recipe-generator.onrender.com` (or similar) and redeploys on
+every push to main.
+
+Free-tier behaviour: the service sleeps after ~15 min idle and cold-starts in
+about a minute. Abuse guards (the URL is public but your key pays): per-IP
+limit of 6 requests/min and a global cap of 100 recipes/day, tunable via
+`RATE_PER_IP_PER_MIN` and `RATE_DAILY_CAP`.
+
 ## Notes & known limits
 
 - Needs the `epicure-cooc` model folder one level up (override with `EPICURE_DIR`).

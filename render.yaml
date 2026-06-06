@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: epicure-recipe-generator
+    runtime: python
+    plan: free
+    rootDir: recipe-generator
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 1 --timeout 120
+    healthCheckPath: /api/health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CLAUDE_MODEL
+        value: claude-sonnet-4-6
+      - key: RATE_PER_IP_PER_MIN
+        value: "6"
+      - key: RATE_DAILY_CAP
+        value: "100"
+      - key: PYTHON_VERSION
+        value: "3.12"

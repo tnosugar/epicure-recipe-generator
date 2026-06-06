@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import json
 import os
+import time
+from collections import defaultdict, deque
 
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -23,6 +25,30 @@ from model_layer import RecipeModel
 
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+# Abuse guards for public deployments: per-IP burst limit + global daily cap.
+# In-memory; resets on restart. Fine for a single-instance prototype.
+RATE_PER_IP_PER_MIN = int(os.environ.get("RATE_PER_IP_PER_MIN", "6"))
+RATE_DAILY_CAP = int(os.environ.get("RATE_DAILY_CAP", "100"))
+_ip_hits: dict[str, deque] = defaultdict(deque)
+_daily = {"day": "", "count": 0}
+
+
+def _rate_limited(ip: str) -> str | None:
+    now = time.time()
+    today = time.strftime("%Y-%m-%d")
+    if _daily["day"] != today:
+        _daily["day"], _daily["count"] = today, 0
+    if _daily["count"] >= RATE_DAILY_CAP:
+        return "Daily recipe budget reached. Try again tomorrow."
+    hits = _ip_hits[ip]
+    while hits and now - hits[0] > 60:
+        hits.popleft()
+    if len(hits) >= RATE_PER_IP_PER_MIN:
+        return "Too many requests - wait a minute and try again."
+    hits.append(now)
+    _daily["count"] += 1
+    return None
 
 app = Flask(__name__, static_folder=None)
 
@@ -118,6 +144,11 @@ def index():
 
 @app.route("/api/generate", methods=["POST"])
 def generate():
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "?").split(",")[0].strip()
+    blocked = _rate_limited(ip)
+    if blocked:
+        return jsonify({"error": blocked}), 429
+
     data = request.get_json(force=True)
     messages = data.get("messages", [])
     current_recipe = data.get("current_recipe")
@@ -152,4 +183,6 @@ def health():
 if __name__ == "__main__":
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("WARNING: ANTHROPIC_API_KEY is not set - recipe writing will fail.")
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    port = int(os.environ.get("PORT", "5000"))
+    host = "0.0.0.0" if "PORT" in os.environ else "127.0.0.1"
+    app.run(host=host, port=port, debug=not bool(os.environ.get("PORT")))
