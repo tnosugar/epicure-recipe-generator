@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Epicure Recipe Generator</title>
 <style>
   :root{
@@ -71,6 +71,28 @@
   .composer button{background:var(--accent);color:#fff;border:none;border-radius:10px;
     padding:0 16px;font-weight:600;cursor:pointer}
   .composer button:disabled{opacity:.5;cursor:default}
+  .handle{display:none}
+
+  /* ---- mobile: chat becomes a bottom sheet ---- */
+  @media (max-width:768px){
+    .main{padding:20px;padding-bottom:150px}
+    .recipe h2{font-size:24px}
+    .cols{grid-template-columns:1fr;gap:24px}
+    .brandbar{margin-bottom:16px}
+    .empty{margin-top:4vh}
+    .side{position:fixed;left:0;right:0;bottom:0;width:100%;min-width:0;
+      height:72vh;border-left:none;border-top:1px solid var(--line);
+      border-radius:16px 16px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.10);
+      transition:height .25s ease;z-index:10}
+    .side.collapsed{height:calc(96px + env(safe-area-inset-bottom))}
+    .side.collapsed header,.side.collapsed .log{display:none}
+    .handle{display:block;text-align:center;padding:10px 0 2px;cursor:pointer;flex-shrink:0}
+    .handle::before{content:"";display:inline-block;width:36px;height:4px;
+      border-radius:2px;background:#d8d0c6}
+    .side header{padding:6px 20px 12px}
+    .composer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+    .composer textarea{font-size:16px}
+  }
 </style>
 </head>
 <body>
@@ -90,7 +112,8 @@
     <div class="recipe" id="recipe" style="display:none"></div>
   </div>
 
-  <aside class="side">
+  <aside class="side" id="side">
+    <div class="handle" id="handle" aria-label="Toggle chat" role="button"></div>
     <header>Recipe chat<small>Ask for a dish, then refine it ("spicier", "swap beef for lamb")</small></header>
     <div class="log" id="log"></div>
     <div class="composer">
@@ -104,6 +127,14 @@ const $ = s => document.querySelector(s);
 const log = $("#log"), input = $("#input"), sendBtn = $("#send");
 let messages = [];        // {role, content}
 let currentRecipe = null;
+
+// Mobile bottom-sheet behaviour: chat fills the screen until a recipe
+// exists, then collapses to an input bar so the recipe is readable.
+const side = $("#side"), mobile = window.matchMedia("(max-width:768px)");
+function setSheet(collapsed){
+  if(mobile.matches) side.classList.toggle("collapsed", collapsed);
+}
+$("#handle").onclick = () => side.classList.toggle("collapsed");
 
 function addMsg(role, text){
   const d = document.createElement("div");
@@ -156,15 +187,18 @@ async function send(text){
     typing.remove();
     if(!res.ok || data.error){
       addMsg("err", data.error || "Something went wrong.");
+      setSheet(false);
     } else {
       currentRecipe = data.recipe;
       renderRecipe(data.recipe, data.brief);
       const reply = data.assistant_message || "Done.";
       addMsg("bot", reply);
       messages.push({role:"assistant", content:reply});
+      setSheet(true);
     }
   }catch(e){
     typing.remove(); addMsg("err", "Network error: "+e.message);
+    setSheet(false);
   }
   setBusy(false);
 }
