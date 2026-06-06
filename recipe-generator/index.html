@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Epicure Recipe Generator</title>
+<style>
+  :root{
+    --bg:#faf7f2; --panel:#fff; --ink:#2b2722; --muted:#8a8079;
+    --line:#ece5db; --accent:#b5552f; --accent-soft:#f3e2d8; --chip:#f0ece4;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       color:var(--ink);background:var(--bg);display:flex;height:100vh;overflow:hidden}
+
+  /* ---- main recipe pane ---- */
+  .main{flex:1;overflow-y:auto;padding:48px 56px}
+  .brandbar{display:flex;align-items:baseline;gap:10px;margin-bottom:28px}
+  .brandbar h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.2px}
+  .brandbar span{color:var(--muted);font-size:13px}
+
+  .empty{max-width:520px;margin:8vh auto 0;text-align:center;color:var(--muted)}
+  .empty h2{color:var(--ink);font-weight:700;font-size:26px;margin:0 0 12px}
+  .empty p{line-height:1.6}
+  .examples{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:22px}
+  .examples button{background:var(--chip);border:1px solid var(--line);color:var(--ink);
+    padding:8px 14px;border-radius:20px;font-size:13px;cursor:pointer}
+  .examples button:hover{background:var(--accent-soft);border-color:var(--accent)}
+
+  .recipe{max-width:680px;margin:0 auto;animation:fade .3s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .recipe h2{font-size:32px;line-height:1.15;margin:0 0 8px;letter-spacing:-.5px}
+  .recipe .desc{color:var(--muted);font-size:16px;line-height:1.5;margin:0 0 18px}
+  .meta{display:flex;gap:18px;font-size:13px;color:var(--muted);
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+    padding:12px 0;margin-bottom:26px}
+  .meta b{color:var(--ink)}
+  .cols{display:grid;grid-template-columns:1fr 1.4fr;gap:40px}
+  .cols h3{font-size:13px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--accent);margin:0 0 14px}
+  ul.ing{list-style:none;margin:0;padding:0}
+  ul.ing li{padding:7px 0;border-bottom:1px dashed var(--line);font-size:15px;
+    display:flex;justify-content:space-between;gap:10px}
+  ul.ing li .q{color:var(--muted);white-space:nowrap}
+  ol.steps{margin:0;padding-left:20px}
+  ol.steps li{padding:0 0 14px;line-height:1.55;font-size:15px}
+  .pairing{margin-top:30px;background:var(--accent-soft);border-radius:12px;
+    padding:16px 18px;font-size:14px;line-height:1.5}
+  .pairing h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chips .c{background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:3px 9px;font-size:12px}
+  .chips .c small{color:var(--muted)}
+
+  /* ---- side chat pane ---- */
+  .side{width:380px;min-width:340px;background:var(--panel);border-left:1px solid var(--line);
+    display:flex;flex-direction:column}
+  .side header{padding:18px 20px;border-bottom:1px solid var(--line);font-weight:600;font-size:15px}
+  .side header small{display:block;color:var(--muted);font-weight:400;margin-top:2px}
+  .log{flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+  .msg{max-width:88%;padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.45}
+  .msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+  .msg.bot{align-self:flex-start;background:var(--chip);border-bottom-left-radius:4px}
+  .msg.err{align-self:stretch;background:#fdecea;color:#9b2c20;border:1px solid #f5c6c0}
+  .typing{align-self:flex-start;color:var(--muted);font-size:13px;font-style:italic}
+  .composer{border-top:1px solid var(--line);padding:14px;display:flex;gap:8px}
+  .composer textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;font:inherit;font-size:14px;height:44px;max-height:120px;outline:none}
+  .composer textarea:focus{border-color:var(--accent)}
+  .composer button{background:var(--accent);color:#fff;border:none;border-radius:10px;
+    padding:0 16px;font-weight:600;cursor:pointer}
+  .composer button:disabled{opacity:.5;cursor:default}
+</style>
+</head>
+<body>
+  <div class="main" id="main">
+    <div class="brandbar"><h1>Epicure</h1><span>recipes powered by ingredient co-occurrence</span></div>
+    <div class="empty" id="empty">
+      <h2>What shall we cook?</h2>
+      <p>Describe a dish, ingredients, or a craving in the chat on the right.
+         The epicure-cooc model picks the pairings; Claude writes the recipe.</p>
+      <div class="examples" id="examples">
+        <button>a comforting beef and cinnamon stew</button>
+        <button>spicy tofu, korean style</button>
+        <button>quick vegetarian pasta with mushrooms</button>
+        <button>a mexican dinner using corn</button>
+      </div>
+    </div>
+    <div class="recipe" id="recipe" style="display:none"></div>
+  </div>
+
+  <aside class="side">
+    <header>Recipe chat<small>Ask for a dish, then refine it ("spicier", "swap beef for lamb")</small></header>
+    <div class="log" id="log"></div>
+    <div class="composer">
+      <textarea id="input" placeholder="Describe a dish or a change..."></textarea>
+      <button id="send">Send</button>
+    </div>
+  </aside>
+
+<script>
+const $ = s => document.querySelector(s);
+const log = $("#log"), input = $("#input"), sendBtn = $("#send");
+let messages = [];        // {role, content}
+let currentRecipe = null;
+
+function addMsg(role, text){
+  const d = document.createElement("div");
+  d.className = "msg " + role;
+  d.textContent = text;
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+  return d;
+}
+
+function renderRecipe(r, brief){
+  $("#empty").style.display = "none";
+  const el = $("#recipe"); el.style.display = "block";
+  const ing = (r.ingredients||[]).map(i =>
+    `<li><span>${i.item||i}</span><span class="q">${i.quantity||""}</span></li>`).join("");
+  const steps = (r.steps||[]).map(s => `<li>${s}</li>`).join("");
+  const chips = (brief && brief.candidates||[]).slice(0,8).map(c =>
+    `<span class="c">${c.name.replace(/_/g," ")} <small>${c.score}</small></span>`).join("");
+  el.innerHTML = `
+    <h2>${r.title||"Recipe"}</h2>
+    <p class="desc">${r.description||""}</p>
+    <div class="meta"><span>Serves <b>${r.servings??"-"}</b></span><span>Time <b>${r.time||"-"}</b></span></div>
+    <div class="cols">
+      <div><h3>Ingredients</h3><ul class="ing">${ing}</ul></div>
+      <div><h3>Method</h3><ol class="steps">${steps}</ol></div>
+    </div>
+    <div class="pairing">
+      <h4>Why these pairings &middot; epicure-cooc</h4>
+      <div>${r.pairing_notes||""}</div>
+      <div class="chips">${chips}</div>
+    </div>`;
+  $("#main").scrollTop = 0;
+}
+
+async function send(text){
+  text = (text||input.value).trim();
+  if(!text) return;
+  input.value = ""; setBusy(true);
+  addMsg("user", text);
+  messages.push({role:"user", content:text});
+  const typing = document.createElement("div");
+  typing.className = "typing"; typing.textContent = "cooking...";
+  log.appendChild(typing); log.scrollTop = log.scrollHeight;
+
+  try{
+    const res = await fetch("/api/generate", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({messages, current_recipe: currentRecipe})
+    });
+    const data = await res.json();
+    typing.remove();
+    if(!res.ok || data.error){
+      addMsg("err", data.error || "Something went wrong.");
+    } else {
+      currentRecipe = data.recipe;
+      renderRecipe(data.recipe, data.brief);
+      const reply = data.assistant_message || "Done.";
+      addMsg("bot", reply);
+      messages.push({role:"assistant", content:reply});
+    }
+  }catch(e){
+    typing.remove(); addMsg("err", "Network error: "+e.message);
+  }
+  setBusy(false);
+}
+
+function setBusy(b){ sendBtn.disabled = b; input.disabled = b; if(!b) input.focus(); }
+
+sendBtn.onclick = () => send();
+input.addEventListener("keydown", e => {
+  if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); send(); }
+});
+$("#examples").addEventListener("click", e => {
+  if(e.target.tagName === "BUTTON") send(e.target.textContent);
+});
+input.focus();
+</script>
+</body>
+</html>

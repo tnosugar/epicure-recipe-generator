@@ -1,0 +1,44 @@
+{
+  "architecture": "metapath2vec_skipgram",
+  "schema": "cooc",
+  "d_model": 300,
+  "vocab_size": 1790,
+  "walk_schema": "pure ingredient-ingredient NPMI co-occurrence walks",
+  "training": {
+    "walks_per_node": 100,
+    "walk_length": 50,
+    "context_size": 7,
+    "negative_samples": 5,
+    "batch_size": 32768,
+    "learning_rate": 0.0025,
+    "epochs": 20,
+    "framework": "pytorch",
+    "objective": "skip-gram-negative-sampling"
+  },
+  "normalization": "raw skip-gram outputs; L2-normalise before cosine ops",
+  "corpus": {
+    "n_recipes": 4135189,
+    "n_recipes_matched": 4103118,
+    "n_sources": 11,
+    "languages": [
+      "en",
+      "zh",
+      "ru",
+      "vi",
+      "es",
+      "tr",
+      "id",
+      "de"
+    ]
+  },
+  "graph": {
+    "ii_edges_npmi": 203508,
+    "ic_edges_typed": 80019,
+    "compound_nodes": 2247,
+    "compound_categories": 15,
+    "ingredient_hubs": 523,
+    "ingredient_non_hubs": 1267
+  },
+  "arxiv": "2605.22391",
+  "paper_title": "Epicure: Navigating the Emergent Geometry of Food Ingredient Embeddings"
+}
